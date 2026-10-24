@@ -1,34 +1,56 @@
+
 name: Build NovaOS ISO
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
+  permissions:
+    contents: read
 
-jobs:
-  build:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    jobs:
+      build:
+          runs-on: ubuntu-24.04
+              steps:
+                    - name: Checkout repository
+                            uses: actions/checkout@v4
 
-      - name: Check build environment
-        run: |
-          uname -m
-          cat /etc/os-release
+                                  - name: Install ISO tools
+                                          run: |
+                                                    sudo apt-get update
+                                                              sudo apt-get install -y \
+                                                                          live-build debootstrap squashfs-tools \
+                                                                                      xorriso isolinux syslinux-common \
+                                                                                                  grub-pc-bin grub-efi-amd64-bin \
+                                                                                                              mtools dosfstools
 
-      - name: Install ISO build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            xorriso squashfs-tools debootstrap \
-            grub-pc-bin grub-efi-amd64-bin \
-            mtools dosfstools
+                                                                                                                    - name: Configure live system
+                                                                                                                            run: |
+                                                                                                                                      mkdir -p novaos-build/config/package-lists
+                                                                                                                                                cd novaos-build
+                                                                                                                                                          lb config \
+                                                                                                                                                                      --distribution noble \
+                                                                                                                                                                                  --architectures amd64 \
+                                                                                                                                                                                              --binary-images iso-hybrid \
+                                                                                                                                                                                                          --archive-areas "main universe" \
+                                                                                                                                                                                                                      --debian-installer false \
+                                                                                                                                                                                                                                  --bootappend-live "boot=live components username=novaos hostname=novaos"
+                                                                                                                                                                                                                                            printf '%s\n' \
+                                                                                                                                                                                                                                                        task-xfce-desktop \
+                                                                                                                                                                                                                                                                    network-manager \
+                                                                                                                                                                                                                                                                                sudo \
+                                                                                                                                                                                                                                                                                            firefox \
+                                                                                                                                                                                                                                                                                                        > config/package-lists/novaos.list.chroot
 
-      - name: Validate project configuration
-        run: |
-          test -f README.md
-          test -f config/novaos.conf
-          test -f docs/BUILD.md
-          echo "NovaOS project files validated."
+                                                                                                                                                                                                                                                                                                              - name: Build live ISO
+                                                                                                                                                                                                                                                                                                                      run: |
+                                                                                                                                                                                                                                                                                                                                cd novaos-build
+                                                                                                                                                                                                                                                                                                                                          sudo lb build
+
+                                                                                                                                                                                                                                                                                                                                                - name: Upload ISO artifact
+                                                                                                                                                                                                                                                                                                                                                        uses: actions/upload-artifact@v4
+                                                                                                                                                                                                                                                                                                                                                                with:
+                                                                                                                                                                                                                                                                                                                                                                          name: NovaOS-live-ISO
+                                                                                                                                                                                                                                                                                                                                                                                    path: novaos-build/*.iso
+                                                                                                                                                                                                                                                                                                                                                                                              if-no-files-found: error
+                                                                                                                                                                                                                                                                                                                                                                                                        retention-days: 7
+                                                                                                                                                                                                                                                                                                                                                                                                        
